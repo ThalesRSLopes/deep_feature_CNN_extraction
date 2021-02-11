@@ -17,11 +17,10 @@ from model.alexnet_Model import alexnet
 model = alexnet(pretrained=True)
 
 #Atualizando os classificadores
-model.classifier[4] = nn.Linear(4096,1024)
-model.classifier[6] = nn.Linear(1024,2)
+model.classifier[6] = nn.Linear(4096,2)
 
 #Carregando os pesos
-model.load_state_dict(torch.load('AlexNetCovid.pt'))
+model.load_state_dict(torch.load('AlexNet_covid.pt'))
 
 #Definindo device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -30,9 +29,10 @@ model.to(device)
 
 # Criando o dataset
 transform = transforms.Compose([
-    transforms.Resize((256,256)),
-    transforms.Grayscale(num_output_channels=3),
-    transforms.ToTensor()
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
 train_data = datasets.ImageFolder('DataSet', transform=transform)
@@ -40,7 +40,6 @@ train_loader = torch.utils.data.DataLoader(train_data, batch_size=1, num_workers
 
 # Criando os hooks das layers desejadas
 features = {}
-
 
 def get_features(name):
     def hook(model, input, output):
@@ -52,10 +51,10 @@ model.features[12].register_forward_hook(get_features('features_alexnet'))
 #criando as listas para cada camada
 max_pooling_f_list = []
 
-#criando a lista para as classes
+#criando as listas para as classes
 output_class = []
 
-i = 1
+i = 0
 # Avaliando a rede
 with torch.no_grad():
     # Deixando a rede em modo de avaliação
@@ -65,15 +64,14 @@ with torch.no_grad():
             data, target = data.cuda(), target.cuda()
         output = model(data)
 
-        #mostrando a classe da imagem e adicionando na lista de classes
+        i = i + 1
+
         if target[0] == 0:
-            #print("{} - Covid19".format(i))
+            print("{} - Covid19".format(i))
             output_class.append("Covid19")
         else:
-            #print("{} - Healthy".format(i))
+            print("{} - Healthy".format(i))
             output_class.append("Healthy")
-
-        i = i+1
 
         aux_array = features['features_alexnet'].cpu().detach().numpy()
         aux_shape = aux_array.shape
